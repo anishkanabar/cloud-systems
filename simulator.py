@@ -1,20 +1,27 @@
-from datetime import datetime
 import csv
 
 class Trace():
     def __init__(self):
-        self.jobs_list = []
+        self.all_jobs = []
+        self.jobs_to_start = []
+        self.completed_jobs = []
     def read_trace(self, data_file):
         '''Reads in the trace and outputs a list of jobs'''
-        pass 
-        return self.jobs_list
-    def __len__(self):
-        return len(self.jobs_list)
+        with open(data_file, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                j = Job()
+                j.prediction_time = int(row['prediction_time'])
+                j.actual_duration = int(row['actual_duration'])
+                j.id = row['job_id']
+                self.all_jobs.append(j)
+                self.jobs_to_start.append(j)
 
 class GPU():
     def __init__(self):
-        self.id = None
-        self.state = 'available'
+        self.id = ''
+        self.state = 'Available'
+        self.job = None
 
 class Cluster:
     def __init__(self):
@@ -35,58 +42,107 @@ class Job:
         self.arrival_time = None
         self.id = None
         self.arrival_time = None
-        self.start_time =None
-        self.end_time = None
-        self.duration = None
+        self.start_time = None
+        self.end_time = 1000
+        self.actual_duration = 0
+        self.prediction_time = None
+        self.state = ' '
     def get_predicted_duration():
         '''Gets the job duration from the trace file'''
         pass
     
 def write_to_csv(text):
     '''Opens and writes output to a csv file'''
-    with open('path/to/csv_file', 'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(text)
+    with open('output.csv', 'w') as f:
+        f.write(str(text))
 
-def get_time():
-    '''Gets the current time'''
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    return current_time
-    
-def scheduler(job, queue, cluster):
+def scheduler(job, cluster,trace):
     '''Assigns a job to an available GPU'''
-    if len(cluster) == 0:
+    if job is not None:
+        job.arrival_time = counter
+        job.state = 'Waiting'
         queue.append(job)
-    else:
-        queue.sort(key=lambda x: x.duration)
-        gpu = cluster.gpus_available[0]
-        gpu.state = 'allocated'
-        c.gpus_available.remove(gpu)
-        queue.remove(job)
-        job.start_time = get_time()
-        write_to_csv(job.start_time)
-        job.end_time = job.arrival_time+job.start_time+job.job_duration
-        counter += 1
-        ### add something to end job and make gpu available again
+    for gpu in cluster.gpus:
+        if gpu.state == 'Available':
+            while len(queue) > 0:
+                queue.sort(key=lambda x: x.prediction_time)
+                job_to_run = queue[0]
+                gpu.job = job_to_run
+                gpu.state = 'Allocated'
+                job_to_run.start_time = counter
+                job_to_run.state = 'Running'
+                job_to_run.end_time = job_to_run.arrival_time + (job_to_run.start_time - job_to_run.arrival_time) + job_to_run.actual_duration
+                #print('gpu job ',gpu.job.id)
+                #print('scheduler job ',gpu.job.id)
+                #input()
+                queue.pop(0)
+                write_to_csv(job_to_run.start_time)
+                break
+    #print("end time ", gpu.job.end_time)
+
+def print_cluster_job_info(cluster, trace):
+    for g in cluster.gpus:
+        gpu_state = g.state
+        gpu_id = g.id
+        try:
+            job_id = g.job.id
+        except:
+            job_id = None
+        output = gpu_state + ' ' + str(gpu_id) + ' ' + str(job_id)
+        print('Cluster GPU state',output)
+    for job in trace.all_jobs:
+        job_id = job.id
+        prediction_time = job.prediction_time
+        output = job_id + ' ' + str(prediction_time) +  ' ' + job.state
+        print('Cluster Job State',output)
+    number_to_complete = len(trace.all_jobs) - len(trace.completed_jobs) 
+    print('Jobs to complete:',number_to_complete)
 
 if __name__ == "__main__":
     queue = []
     counter = 0
-    data_file = ''
-    t = Trace()
-    t.read_trace(data_file)
-    n_gpus = 6500 # change to exact number
+    data_file = 'sample_data.csv'
+    trace = Trace()
+    trace.read_trace(data_file)
+    n_gpus = 5 # change to exact number
     gpus = []
     
-    for n in range(len(n_gpus)):
+    for n in range(n_gpus):
         g = GPU()
+        g.id = n
         gpus.append(g)
-    c = Cluster()
-    c.n_gpus = n_gpus
-    c.gpus = gpus
+    cluster = Cluster()
+    cluster.n_gpus = n_gpus
+    cluster.gpus = gpus
 
-    for u in range(len(t)):
-        j = Job()
-        scheduler(j, t, queue, c)
-
+    #job_iter = iter(trace.jobs_to_complete)
+    while len(trace.completed_jobs) < len(trace.all_jobs):
+        if len(trace.jobs_to_start) > 0:
+            incoming_job = trace.jobs_to_start[0]
+            scheduler(incoming_job,cluster,trace)
+            print('Job',incoming_job.id,'arrives')
+            trace.jobs_to_start.pop(0)
+        else:
+            incoming_job = None
+            scheduler(incoming_job,cluster,trace)
+        #print('before update')
+        #print_cluster_job_info(cluster, trace)
+        #input()
+        for gpu in cluster.gpus:
+            # print('gpu job after scheduling',gpu.job)
+            try:
+                if gpu.job.end_time <= counter:
+                    gpu.state = 'Available'
+                    gpu.job.state = 'Completed'
+                    trace.completed_jobs.append(gpu.job)
+                    gpu.job = None
+                    print(gpu.job.id, 'has completed')
+                    
+            except:
+                #print('no gpu job is completed')
+                print(' ')
+        #print('after update')
+        #print_cluster_job_info(cluster, trace)
+        counter += 1
+        print_cluster_job_info(cluster, trace)
+        input()
