@@ -1,6 +1,7 @@
 import csv
 
 class Trace():
+    '''A class for representing the Alibaba cluster trace'''
     def __init__(self):
         self.all_jobs = []
         self.jobs_to_start = []
