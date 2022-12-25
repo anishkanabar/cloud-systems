@@ -1,13 +1,15 @@
+# A discrete time GPU trace simulator 
+
 import csv
 
 class Trace():
-    '''A class for representing the Alibaba cluster trace'''
+    """Represents the Alibaba cluster trace"""
     def __init__(self):
         self.all_jobs = []
         self.jobs_to_start = []
         self.completed_jobs = []
     def read_trace(self, data_file):
-        '''Reads in the trace and outputs a list of jobs'''
+        """Reads in the trace and creates a list of jobs"""
         with open(data_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -19,18 +21,20 @@ class Trace():
                 self.jobs_to_start.append(j)
 
 class GPU():
+    """Represents a single GPU"""
     def __init__(self):
         self.id = ''
         self.state = 'Available'
         self.job = None
 
 class Cluster:
+    """Represents the entire cluster of GPU's"""
     def __init__(self):
         self.n_gpu = None
         self.gpus = []
         self.gpus_available = []
     def get_gpus(self):
-        '''Returns a list of available gpus'''
+        """Returns a list of available GPU's"""
         for g in range(len(self.gpus)):
             if g.state == 'available':
                 self.gpus_available.append(g)
@@ -39,6 +43,7 @@ class Cluster:
         return len(self.gpus_available)
 
 class Job:
+    """Represents a single job"""
     def __init__(self):
         self.arrival_time = None
         self.id = None
@@ -48,17 +53,14 @@ class Job:
         self.actual_duration = 0
         self.prediction_time = None
         self.state = ' '
-    def get_predicted_duration():
-        '''Gets the job duration from the trace file'''
-        pass
     
 def write_to_csv(text):
-    '''Opens and writes output to a csv file'''
+    """Opens and writes output to a csv file"""
     with open('output.csv', 'w') as f:
         f.write(str(text))
 
 def scheduler(job, cluster,trace):
-    '''Assigns a job to an available GPU'''
+    """Assigns a job to an available GPU"""
     if job is not None:
         job.arrival_time = counter
         job.state = 'Waiting'
@@ -82,6 +84,7 @@ def scheduler(job, cluster,trace):
     #print("end time ", gpu.job.end_time)
 
 def print_cluster_job_info(cluster, trace):
+    """Prints the status of all jobs across all GPU's"""
     for g in cluster.gpus:
         gpu_state = g.state
         gpu_id = g.id
@@ -105,9 +108,10 @@ if __name__ == "__main__":
     data_file = 'sample_data.csv'
     trace = Trace()
     trace.read_trace(data_file)
-    n_gpus = 5 # change to exact number
+    n_gpus = 6500 # Change to exact number
     gpus = []
     
+    # Create the cluster 
     for n in range(n_gpus):
         g = GPU()
         g.id = n
@@ -116,7 +120,7 @@ if __name__ == "__main__":
     cluster.n_gpus = n_gpus
     cluster.gpus = gpus
 
-    #job_iter = iter(trace.jobs_to_complete)
+    # Call the scheduler for each job until all are completed
     while len(trace.completed_jobs) < len(trace.all_jobs):
         if len(trace.jobs_to_start) > 0:
             incoming_job = trace.jobs_to_start[0]
@@ -129,6 +133,8 @@ if __name__ == "__main__":
         #print('before update')
         #print_cluster_job_info(cluster, trace)
         #input()
+
+        # If the counter exceeds the job end time, move it to completed
         for gpu in cluster.gpus:
             # print('gpu job after scheduling',gpu.job)
             try:
@@ -138,7 +144,6 @@ if __name__ == "__main__":
                     trace.completed_jobs.append(gpu.job)
                     gpu.job = None
                     print(gpu.job.id, 'has completed')
-                    
             except:
                 #print('no gpu job is completed')
                 print(' ')
